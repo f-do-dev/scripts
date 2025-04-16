@@ -11,7 +11,7 @@ wget -qO- https://get.docker.com/ | sudo bash
 
 # 创建持久化数据目录
 mkdir -p /home/ubuntu/data/new-api
-
+echo "✅ 开始安装 Docker 和部署 new-api..."
 # 运行 Docker 容器
 sudo docker run --name new-api -d \
   --restart always \
