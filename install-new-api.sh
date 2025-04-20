@@ -30,7 +30,27 @@ sudo mysql -e "FLUSH PRIVILEGES;"
 # 创建数据库
 sudo mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS oneapi;"
 
+echo "✅ MySQL 配置完成"
+echo "✅ 开始部署 new-api..."
+
+# 运行 Docker 容器
+sudo docker run --name new-api -d \
+  --restart always \
+  --network host \
+  -e SQL_DSN="root:${MYSQL_ROOT_PASSWORD}@tcp(localhost:3306)/oneapi" \
+  -e TZ=Asia/Shanghai \
+  -e GENERATE_DEFAULT_TOKEN=true \
+  -v /home/ubuntu/data/new-api:/data \
+  calciumion/new-api:latest
+
+echo "✅ new-api 部署完成"
+
+# 等待几秒钟让服务启动
+echo "等待服务启动..."
+sleep 10
+
 # 执行初始化 SQL 语句
+echo "开始执行数据库初始化..."
 sudo mysql -u root -p"$MYSQL_ROOT_PASSWORD" oneapi << 'EOF'
 INSERT INTO `abilities` (`group`, `model`, `channel_id`, `enabled`, `priority`, `weight`, `tag`) VALUES
 ('default', 'gpt-4-1106-preview', 1, 1, 0, 0, '');
@@ -48,19 +68,7 @@ INSERT INTO `options` (`key`, `value`) VALUES
 ('SelfUseModeEnabled', 'true');
 EOF
 
-echo "✅ MySQL 配置完成"
-echo "✅ 开始部署 new-api..."
-
-# 运行 Docker 容器
-sudo docker run --name new-api -d \
-  --restart always \
-  --network host \
-  -e SQL_DSN="root:${MYSQL_ROOT_PASSWORD}@tcp(localhost:3306)/oneapi" \
-  -e TZ=Asia/Shanghai \
-  -v /home/ubuntu/data/new-api:/data \
-  calciumion/new-api:latest
-
-echo "✅ new-api 部署完成"
+echo "✅ 数据库初始化完成"
 echo "✅ MySQL 密码已保存在 /home/ubuntu/data/new-api/mysql_credentials.txt"
 echo "⚠️ 请妥善保管密码文件，建议记录后删除"
 
