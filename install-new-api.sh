@@ -36,7 +36,7 @@ echo "✅ 开始部署 new-api..."
 # 运行 Docker 容器
 sudo docker run --name new-api -d \
   --restart always \
-  --network host \
+  -p 80:3000 \
   -e SQL_DSN="root:${MYSQL_ROOT_PASSWORD}@tcp(localhost:3306)/oneapi" \
   -e TZ=Asia/Shanghai \
   -e GENERATE_DEFAULT_TOKEN=true \
