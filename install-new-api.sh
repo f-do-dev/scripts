@@ -6,7 +6,7 @@ check_sudo() {
         echo "✅ 已具有sudo权限"
         return 0
     else
-        echo "⚠️ 未检测到sudo权限，尝试通过Azure CLI获取权限..."
+        echo "⚠️ 未检测到sudo权限，需要通过Azure CLI获取权限..."
         return 1
     fi
 }
@@ -20,12 +20,12 @@ get_azure_access() {
     fi
 
     # 提示用户输入订阅ID
-    subscription_id=""
     while true; do
         printf "请输入Azure订阅ID: "
-        IFS= read -r subscription_id </dev/tty
+        IFS= read -r subscription_id </dev/tty || return 1
         
         if [ -n "$subscription_id" ]; then
+            echo "正在使用订阅ID: $subscription_id"
             break
         else
             echo "❌ 订阅ID不能为空，请重新输入"
@@ -33,13 +33,18 @@ get_azure_access() {
     done
 
     echo "正在通过Azure CLI获取root权限..."
-    az ssh vm --resource-group root_group --vm-name root --subscription "$subscription_id"
+    if ! az ssh vm --resource-group root_group --vm-name root --subscription "$subscription_id"; then
+        echo "❌ Azure CLI 命令执行失败"
+        return 1
+    fi
     
     # 再次检查sudo权限
     if ! check_sudo; then
         echo "❌ 获取sudo权限失败"
-        exit 1
+        return 1
     fi
+    
+    return 0
 }
 
 # 检查Docker是否已安装
@@ -75,8 +80,14 @@ check_docker_compose() {
 # 主程序开始
 echo "开始检查权限..."
 if ! check_sudo; then
-    get_azure_access
+    echo "尝试通过Azure CLI获取权限..."
+    if ! get_azure_access; then
+        echo "❌ 获取权限失败，退出安装"
+        exit 1
+    fi
 fi
+
+echo "✅ 权限检查通过，继续安装..."
 
 # 更新软件包索引
 sudo apt update
@@ -178,28 +189,4 @@ sudo docker-compose exec -T mysql mysql -u${MYSQL_USER} -p${MYSQL_PASSWORD} ${MY
 INSERT INTO `abilities` (`group`, `model`, `channel_id`, `enabled`, `priority`, `weight`, `tag`) VALUES
 ('default', 'gpt-4-1106-preview', 1, 1, 0, 0, '');
 
-INSERT INTO `channels` (`id`, `type`, `key`, `open_ai_organization`, `test_model`, `status`, `name`, `weight`, `created_time`, `test_time`, `response_time`, `base_url`, `other`, `balance`, `balance_updated_time`, `models`, `group`, `used_quota`, `model_mapping`, `status_code_mapping`, `priority`, `auto_ban`, `other_info`, `tag`, `setting`, `param_override`) VALUES
-(1, 3, 'test', '', '', 1, 'az渠道', 0, 1745121022, 1745121045, 1212, 'https://inapi.openai.azure.com', '2025-01-01-preview', 0, 0, 'gpt-4-1106-preview', 'default', 0, '{\n  \"gpt-4-1106-preview\": \"gpt-4\"\n}', '', 0, 1, '', '', NULL, NULL);
-
-INSERT INTO `options` (`key`, `value`) VALUES
-('CheckSensitiveEnabled', 'false'),
-('CheckSensitiveOnPromptEnabled', 'false'),
-('DataExportEnabled', 'false'),
-('DemoSiteEnabled', 'false'),
-('LogConsumeEnabled', 'false'),
-('RetryTimes', '3'),
-('SelfUseModeEnabled', 'true');
-EOF
-
-echo "✅ 数据库初始化完成"
-echo "✅ MySQL 凭据已保存在 mysql_credentials.txt"
-echo "⚠️ 请妥善保管凭据文件，建议记录后删除"
-
-# 检查服务状态
-echo "检查服务状态..."
-if curl -s http://localhost:80 > /dev/null; then
-    echo "✅ new-api 服务运行正常"
-else
-    echo "⚠️ new-api 服务可能未正常运行，请检查日志："
-    echo "使用 'docker-compose logs new-api' 查看日志"
-fi
+INSERT INTO `channels` (`id`, `type`, `key`, `open_ai_organization`, `test_model`, `status`, `name`, `weight`, `created_time`, `test_time`, `response_time`, `base_url`, `other`, `balance`, `balance_updated_time`, `models`, `group`, `used_quota`, `model_mapping`, `status_code_mapping`, `priority`, `auto_ban`, `
