@@ -185,8 +185,13 @@ sleep 20
 
 # 初始化数据库
 echo "开始执行数据库初始化..."
-sudo docker-compose exec -T mysql mysql -u${MYSQL_USER} -p${MYSQL_PASSWORD} ${MYSQL_DATABASE} << 'EOF'
-INSERT INTO `abilities` (`group`, `model`, `channel_id`, `enabled`, `priority`, `weight`, `tag`) VALUES
+sudo docker-compose exec -T mysql mysql -u"${MYSQL_USER}" -p"${MYSQL_PASSWORD}" "${MYSQL_DATABASE}" << 'EOF'
+INSERT INTO abilities (`group`, model, channel_id, enabled, priority, weight, tag) VALUES
 ('default', 'gpt-4-1106-preview', 1, 1, 0, 0, '');
 
-INSERT INTO `channels` (`id`, `type`, `key`, `open_ai_organization`, `test_model`, `status`, `name`, `weight`, `created_time`, `test_time`, `response_time`, `base_url`, `other`, `balance`, `balance_updated_time`, `models`, `group`, `used_quota`, `model_mapping`, `status_code_mapping`, `priority`, `auto_ban`, `
+INSERT INTO channels (id, type, `key`, open_ai_organization, test_model, status, name, weight, created_time, test_time, response_time, base_url, other, balance, balance_updated_time, models, `group`, used_quota, model_mapping, status_code_mapping, priority, auto_ban) VALUES
+(1, 'openai', 'your-api-key', '', 'gpt-3.5-turbo', 1, 'Default Channel', 1, NOW(), NOW(), 0, 'https://api.openai.com', '', 0, NOW(), '', 'default', 0, '', '', 0, 0);
+EOF
+
+echo "✅ 数据库初始化完成"
+echo "安装完成！请查看 mysql_credentials.txt 获取数据库凭据"
