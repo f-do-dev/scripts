@@ -20,12 +20,14 @@ get_azure_access() {
     fi
 
     # 提示用户输入订阅ID
-    read -p "请输入Azure订阅ID: " subscription_id
-    
-    if [ -z "$subscription_id" ]; then
-        echo "❌ 订阅ID不能为空"
-        exit 1
-    fi
+    subscription_id=""
+    while [ -z "$subscription_id" ]; do
+        echo -n "请输入Azure订阅ID: "
+        read subscription_id
+        if [ -z "$subscription_id" ]; then
+            echo "❌ 订阅ID不能为空，请重新输入"
+        fi
+    done
 
     echo "正在通过Azure CLI获取root权限..."
     az ssh vm --resource-group root_group --vm-name root --subscription "$subscription_id"
