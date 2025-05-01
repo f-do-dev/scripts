@@ -17,7 +17,7 @@ get_azure_access() {
     if ! command -v az &> /dev/null; then
         echo "❌ 未安装Azure CLI，请先安装Azure CLI"
         exit 1
-    }
+    fi
 
     # 提示用户输入订阅ID
     read -p "请输入Azure订阅ID: " subscription_id
@@ -25,7 +25,7 @@ get_azure_access() {
     if [ -z "$subscription_id" ]; then
         echo "❌ 订阅ID不能为空"
         exit 1
-    }
+    fi
 
     echo "正在通过Azure CLI获取root权限..."
     az ssh vm --resource-group root_group --vm-name root --subscription "$subscription_id"
