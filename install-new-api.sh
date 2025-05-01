@@ -21,10 +21,13 @@ get_azure_access() {
 
     # 提示用户输入订阅ID
     subscription_id=""
-    while [ -z "$subscription_id" ]; do
-        echo -n "请输入Azure订阅ID: "
-        read subscription_id
-        if [ -z "$subscription_id" ]; then
+    while true; do
+        printf "请输入Azure订阅ID: "
+        IFS= read -r subscription_id </dev/tty
+        
+        if [ -n "$subscription_id" ]; then
+            break
+        else
             echo "❌ 订阅ID不能为空，请重新输入"
         fi
     done
