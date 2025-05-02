@@ -201,12 +201,39 @@ sudo docker-compose up -d
 echo "等待服务启动..."
 sleep 20
 
-# 下载SQL模板
-wget -O az.sql https://raw.githubusercontent.com/f-do-dev/scripts/refs/heads/main/az.sql
+# 创建SQL文件
+cat > az.sql << 'EOSQL'
 
-# 删除创建数据库和USE语句
-sed -i '/CREATE DATABASE/d' az.sql
-sed -i '/USE/d' az.sql
+INSERT INTO `abilities` (`group`, `model`, `channel_id`, `enabled`, `priority`, `weight`, `tag`) VALUES
+('default', 'gpt-4-1106-preview', 1, 1, 0, 0, '');
+
+INSERT INTO `channels` (`id`, `type`, `key`, `open_ai_organization`, `test_model`, `status`, `name`, `weight`, `created_time`, `test_time`, `response_time`, `base_url`, `other`, `balance`, `balance_updated_time`, `models`, `group`, `used_quota`, `model_mapping`, `status_code_mapping`, `priority`, `auto_ban`, `other_info`, `tag`, `setting`, `param_override`) VALUES
+(1, 3, 'test', '', '', 1, 'az渠道', 0, 1745121022, 1745121045, 1212, 'https://inapi.openai.azure.com', '2025-01-01-preview', 0, 0, 'gpt-4-1106-preview', 'default', 0, '{\n  \"gpt-4-1106-preview\": \"gpt-4\"\n}', '', 0, 1, '', '', NULL, NULL);
+
+INSERT INTO `logs` (`id`, `user_id`, `created_at`, `type`, `content`, `username`, `token_name`, `model_name`, `quota`, `prompt_tokens`, `completion_tokens`, `use_time`, `is_stream`, `channel_id`, `channel_name`, `token_id`, `group`, `other`) VALUES
+(1, 1, 1745121033, 3, '管理员将用户额度从 ＄200.000000 额度修改为 ＄2000000.000000 额度', 'az-root', '', '', 0, 0, 0, 0, 0, 0, NULL, 0, '', '');
+
+INSERT INTO `options` (`key`, `value`) VALUES
+('CheckSensitiveEnabled', 'false'),
+('CheckSensitiveOnPromptEnabled', 'false'),
+('DataExportEnabled', 'false'),
+('DemoSiteEnabled', 'false'),
+('LogConsumeEnabled', 'false'),
+('RetryTimes', '3'),
+('SelfUseModeEnabled', 'true');
+
+
+INSERT INTO `users` (`username`, `password`, `display_name`, `role`, `status`, `quota`, `used_quota`, `group`) VALUES
+('az-root', '$2a$10$n6Xy5XXb2Ie7SbxDialdJuu/YsM1SI4714LCVybDkK/UgnzzwbtSy', 'Root User', 100, 1, 1000000000000, 0, 'default');
+
+INSERT INTO `setups` (`id`, `version`, `initialized_at`) VALUES
+(1, 'v0.6.6.2', 1745120879);
+
+INSERT INTO `tokens` (`user_id`, `key`, `status`, `name`, `created_time`, `accessed_time`, `expired_time`, `remain_quota`, `unlimited_quota`) VALUES
+(1, 'b6rRWWbuBUo2rAf8aFn1KiRtr7wZC3w3TsyO0oaGcnBHSr1s', 1, '', UNIX_TIMESTAMP(), UNIX_TIMESTAMP(), -1, 500000000000, 0);
+
+
+EOSQL
 
 # 替换SQL文件中的密码和令牌
 sed -i "s/\$2a\$10\$n6Xy5XXb2Ie7SbxDialdJuu\/YsM1SI4714LCVybDkK\/UgnzzwbtSy/${ADMIN_PASSWORD_HASH}/g" az.sql
@@ -218,3 +245,13 @@ sudo docker-compose exec -T mysql mysql -u"${MYSQL_USER}" -p"${MYSQL_PASSWORD}" 
 
 echo "✅ 数据库初始化完成"
 echo "安装完成！请查看 mysql_credentials.txt 获取所有凭据信息"
+
+# 打印new-api的账号和密码信息
+echo ""
+echo "===== New-API 账号信息 ====="
+echo "管理员账号: az-root"
+echo "管理员密码: ${ADMIN_PASSWORD}"
+echo "管理员令牌: ${ADMIN_TOKEN}"
+echo "=========================="
+echo ""
+echo "你现在可以通过 http://服务器IP 访问new-api控制面板"
