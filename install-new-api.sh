@@ -143,6 +143,16 @@ sudo mkdir -p /home/ubuntu/new-api
 sudo chown -R $USER:$USER /home/ubuntu/new-api
 cd /home/ubuntu/new-api || exit 1
 
+# 清理已存在的文件和Docker容器
+echo "清理已存在的配置和容器..."
+if [ -f "docker-compose.yml" ]; then
+    sudo docker-compose down -v
+    sudo rm docker-compose.yml
+fi
+if [ -f "mysql_credentials.txt" ]; then
+    sudo rm mysql_credentials.txt
+fi
+
 # 创建 docker-compose.yml - 使用sudo tee而不是重定向
 sudo bash -c "cat > docker-compose.yml << EOF
 version: '3'
