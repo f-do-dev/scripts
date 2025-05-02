@@ -96,10 +96,10 @@ fi
 echo "✅ 权限检查通过，继续安装..."
 
 # 更新软件包索引
-sudo apt update
+#sudo apt update
 
 # 安装必要的软件包
-sudo apt install -y wget curl
+#sudo apt install -y wget curl
 
 # 检查并安装Docker
 if ! check_docker; then
