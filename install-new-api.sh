@@ -138,7 +138,7 @@ export MYSQL_USER
 export MYSQL_PASSWORD
 
 # 创建 docker-compose.yml
-cat > docker-compose.yml << EOF
+sudo cat > docker-compose.yml << EOF
 version: '3'
 
 services:
@@ -180,7 +180,7 @@ volumes:
 EOF
 
 # 保存数据库凭据
-cat > mysql_credentials.txt << EOF
+sudo cat > mysql_credentials.txt << EOF
 MySQL Root Password: ${MYSQL_ROOT_PASSWORD}
 MySQL Database: ${MYSQL_DATABASE}
 MySQL User: ${MYSQL_USER}
@@ -189,7 +189,7 @@ Admin Username: az-root
 Admin Password: ${ADMIN_PASSWORD}
 Admin Token: ${ADMIN_TOKEN}
 EOF
-chmod 600 mysql_credentials.txt
+sudo chmod 600 mysql_credentials.txt
 
 echo "✅ 配置文件创建完成"
 echo "✅ 开始启动服务..."
@@ -202,7 +202,7 @@ echo "等待服务启动..."
 sleep 20
 
 # 创建SQL文件
-cat > az.sql << 'EOSQL'
+sudo cat > az.sql << 'EOSQL'
 
 INSERT INTO `abilities` (`group`, `model`, `channel_id`, `enabled`, `priority`, `weight`, `tag`) VALUES
 ('default', 'gpt-4-1106-preview', 1, 1, 0, 0, '');
@@ -236,8 +236,8 @@ INSERT INTO `tokens` (`user_id`, `key`, `status`, `name`, `created_time`, `acces
 EOSQL
 
 # 替换SQL文件中的密码和令牌
-sed -i "s/\$2a\$10\$n6Xy5XXb2Ie7SbxDialdJuu\/YsM1SI4714LCVybDkK\/UgnzzwbtSy/${ADMIN_PASSWORD_HASH}/g" az.sql
-sed -i "s/b6rRWWbuBUo2rAf8aFn1KiRtr7wZC3w3TsyO0oaGcnBHSr1s/${ADMIN_TOKEN}/g" az.sql
+sudo sed -i "s/\$2a\$10\$n6Xy5XXb2Ie7SbxDialdJuu\/YsM1SI4714LCVybDkK\/UgnzzwbtSy/${ADMIN_PASSWORD_HASH}/g" az.sql
+sudo sed -i "s/b6rRWWbuBUo2rAf8aFn1KiRtr7wZC3w3TsyO0oaGcnBHSr1s/${ADMIN_TOKEN}/g" az.sql
 
 # 初始化数据库
 echo "开始导入数据库..."
