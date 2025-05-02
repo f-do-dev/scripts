@@ -119,8 +119,8 @@ else
 fi
 
 # 创建项目目录
-mkdir -p /home/ubuntu/new-api
-cd /home/ubuntu/new-api
+sudo mkdir -p /home/ubuntu/new-api
+cd /home/ubuntu/new-api || exit 1
 
 # 生成随机密码和令牌
 MYSQL_ROOT_PASSWORD=$(generate_random_string 20)
