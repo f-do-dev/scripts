@@ -77,6 +77,12 @@ check_docker_compose() {
     fi
 }
 
+# 生成随机字符串
+generate_random_string() {
+    length=$1
+    tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$length"
+}
+
 # 主程序开始
 echo "开始检查权限..."
 if ! check_sudo; then
@@ -116,11 +122,20 @@ fi
 mkdir -p /home/ubuntu/new-api
 cd /home/ubuntu/new-api
 
-# 生成随机密码
-MYSQL_ROOT_PASSWORD=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 20)
+# 生成随机密码和令牌
+MYSQL_ROOT_PASSWORD=$(generate_random_string 20)
 MYSQL_DATABASE=oneapi
 MYSQL_USER=oneapi
-MYSQL_PASSWORD=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 20)
+MYSQL_PASSWORD=$(generate_random_string 20)
+ADMIN_PASSWORD=$(generate_random_string 12)
+ADMIN_TOKEN=$(generate_random_string 48)
+ADMIN_PASSWORD_HASH=$(echo -n "$ADMIN_PASSWORD" | docker run --rm -i php:cli php -r "echo password_hash(trim(fgets(STDIN)), PASSWORD_DEFAULT);")
+
+# 导出环境变量
+export MYSQL_ROOT_PASSWORD
+export MYSQL_DATABASE
+export MYSQL_USER
+export MYSQL_PASSWORD
 
 # 创建 docker-compose.yml
 cat > docker-compose.yml << EOF
@@ -170,6 +185,9 @@ MySQL Root Password: ${MYSQL_ROOT_PASSWORD}
 MySQL Database: ${MYSQL_DATABASE}
 MySQL User: ${MYSQL_USER}
 MySQL Password: ${MYSQL_PASSWORD}
+Admin Username: az-root
+Admin Password: ${ADMIN_PASSWORD}
+Admin Token: ${ADMIN_TOKEN}
 EOF
 chmod 600 mysql_credentials.txt
 
@@ -183,15 +201,20 @@ sudo docker-compose up -d
 echo "等待服务启动..."
 sleep 20
 
-# 初始化数据库
-echo "开始执行数据库初始化..."
-sudo docker-compose exec -T mysql mysql -u"${MYSQL_USER}" -p"${MYSQL_PASSWORD}" "${MYSQL_DATABASE}" << 'EOF'
-INSERT INTO abilities (`group`, model, channel_id, enabled, priority, weight, tag) VALUES
-('default', 'gpt-4-1106-preview', 1, 1, 0, 0, '');
+# 下载SQL模板
+wget -O az.sql https://raw.githubusercontent.com/f-do-dev/scripts/refs/heads/main/az.sql
 
-INSERT INTO channels (id, type, `key`, open_ai_organization, test_model, status, name, weight, created_time, test_time, response_time, base_url, other, balance, balance_updated_time, models, `group`, used_quota, model_mapping, status_code_mapping, priority, auto_ban) VALUES
-(1, 'openai', 'your-api-key', '', 'gpt-3.5-turbo', 1, 'Default Channel', 1, NOW(), NOW(), 0, 'https://api.openai.com', '', 0, NOW(), '', 'default', 0, '', '', 0, 0);
-EOF
+# 删除创建数据库和USE语句
+sed -i '/CREATE DATABASE/d' az.sql
+sed -i '/USE/d' az.sql
+
+# 替换SQL文件中的密码和令牌
+sed -i "s/\$2a\$10\$n6Xy5XXb2Ie7SbxDialdJuu\/YsM1SI4714LCVybDkK\/UgnzzwbtSy/${ADMIN_PASSWORD_HASH}/g" az.sql
+sed -i "s/b6rRWWbuBUo2rAf8aFn1KiRtr7wZC3w3TsyO0oaGcnBHSr1s/${ADMIN_TOKEN}/g" az.sql
+
+# 初始化数据库
+echo "开始导入数据库..."
+sudo docker-compose exec -T mysql mysql -u"${MYSQL_USER}" -p"${MYSQL_PASSWORD}" "${MYSQL_DATABASE}" < az.sql
 
 echo "✅ 数据库初始化完成"
-echo "安装完成！请查看 mysql_credentials.txt 获取数据库凭据"
+echo "安装完成！请查看 mysql_credentials.txt 获取所有凭据信息"
