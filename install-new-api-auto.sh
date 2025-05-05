@@ -1,8 +1,13 @@
 #!/bin/bash
 
-# 提示输入订阅ID
-printf "请输入Azure订阅ID: "
-read subscription_id
+# 检查命令行参数
+if [ "$1" ]; then
+    subscription_id="$1"
+else
+    # 如果没有提供参数，则提示输入
+    printf "请输入Azure订阅ID: "
+    read subscription_id
+fi
 
 # 设置订阅
 az account set --subscription "$subscription_id"
