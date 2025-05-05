@@ -18,6 +18,8 @@ vm_exists=$(az vm list --resource-group root_group --query "[?name=='root'].name
 if [ -z "$vm_exists" ]; then
     echo "Creating VM..."
     az vm create --resource-group root_group --name root --image UbuntuLTS --admin-username azureuser --generate-ssh-keys --size Standard_DS1_v2
+    # 创建 VM 后开放 80 端口
+    az vm open-port -n root -g root_group --port 80
 else
     echo "VM already exists."
 fi
