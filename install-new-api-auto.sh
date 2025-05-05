@@ -5,9 +5,9 @@ create_azure_vm() {
     echo "开始创建Azure VM实例..."
     
     # 设置变量
-    RESOURCE_GROUP="oneapi-group"
+    RESOURCE_GROUP="vm-group"
     LOCATION="eastus"  # 可以根据需要修改位置
-    VM_NAME="oneapi-vm"
+    VM_NAME="vm-01"
     VM_SIZE="Standard_B2s"  # 可以根据需要修改VM大小
     
     # 创建资源组
