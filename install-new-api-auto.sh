@@ -9,24 +9,51 @@ else
     read subscription_id
 fi
 
-# 设置订阅
-az account set --subscription "$subscription_id"
+# 检查是否已登录Azure
+if ! az account show &>/dev/null; then
+    echo "❌ 您尚未登录Azure，请先运行 'az login' 进行登录"
+    exit 1
+fi
+
+# 设置订阅并验证
+echo "正在设置Azure订阅..."
+if ! az account set --subscription "$subscription_id"; then
+    echo "❌ 设置订阅失败，请检查订阅ID是否正确"
+    echo "当前可用的订阅列表："
+    az account list --query "[].{Name:name, SubscriptionId:id}" -o table
+    exit 1
+fi
+
+echo "✅ 成功设置订阅：$(az account show --query name -o tsv)"
 
 # 创建资源组若不存在
 if ! az group exists --name root_group; then
-    echo "Creating resource group..."
-    az group create --name root_group --location eastus
+    echo "资源组不存在，正在创建资源组..."
+    if ! az group create --name root_group --location eastus; then
+        echo "❌ 创建资源组失败，请检查您的Azure订阅权限"
+        exit 1
+    fi
+    echo "✅ 资源组创建成功"
 fi
 
 # 检查VM是否存在，创建若不存在
+echo "检查虚拟机是否存在..."
 vm_exists=$(az vm list --resource-group root_group --query "[?name=='root'].name" -o tsv)
 if [ -z "$vm_exists" ]; then
-    echo "Creating VM..."
-    az vm create --resource-group root_group --name root --image UbuntuLTS --admin-username azureuser --generate-ssh-keys --size Standard_DS1_v2
-    # 创建 VM 后开放 80 端口
-    az vm open-port -n root -g root_group --port 80
+    echo "虚拟机不存在，开始创建..."
+    if ! az vm create --resource-group root_group --name root --image UbuntuLTS --admin-username azureuser --generate-ssh-keys --size Standard_DS1_v2; then
+        echo "❌ 创建虚拟机失败，请检查资源配额或权限"
+        exit 1
+    fi
+    echo "✅ 虚拟机创建成功"
+    echo "开放80端口..."
+    if ! az vm open-port -n root -g root_group --port 80; then
+        echo "❌ 开放端口失败"
+        exit 1
+    fi
+    echo "✅ 端口开放成功"
 else
-    echo "VM already exists."
+    echo "✅ 虚拟机已存在，跳过创建步骤"
 fi
 
 # 定义安装脚本
