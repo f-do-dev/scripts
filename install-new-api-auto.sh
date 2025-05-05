@@ -10,6 +10,18 @@ create_azure_vm() {
     VM_NAME="vm-01"
     VM_SIZE="Standard_B2s"  # 可以根据需要修改VM大小
     
+    # 注册必要的资源提供程序
+    echo "正在注册必要的资源提供程序..."
+    az provider register --namespace Microsoft.Compute
+    az provider register --namespace Microsoft.Network
+    az provider register --namespace Microsoft.Storage
+
+    # 等待注册完成
+    echo "等待资源提供程序注册完成..."
+    az provider show -n Microsoft.Compute -o table
+    az provider show -n Microsoft.Network -o table
+    az provider show -n Microsoft.Storage -o table
+
     # 创建资源组
     echo "创建资源组..."
     az group create --name $RESOURCE_GROUP --location $LOCATION
@@ -24,6 +36,12 @@ create_azure_vm() {
         --generate-ssh-keys \
         --size $VM_SIZE \
         --public-ip-sku Standard
+
+    # 如果VM创建失败，则退出
+    if [ $? -ne 0 ]; then
+        echo "❌ 虚拟机创建失败"
+        exit 1
+    fi
 
     # 开放80端口
     echo "开放80端口..."
