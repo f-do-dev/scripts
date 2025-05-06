@@ -63,19 +63,17 @@ create_azure_vm() {
     echo "✅ VM创建成功！公共IP地址: $PUBLIC_IP"
     echo "✅ 80端口已开放"
     
-    # 获取当前脚本的内容
-    SCRIPT_CONTENT=$(cat "$0")
-
     # 等待VM完全启动
     echo "等待VM启动完成..."
     sleep 30
 
-    # 保存IP地址到文件中，供后续使用
-    echo "$PUBLIC_IP" > /tmp/vm_ip.txt
+    # 将脚本复制到远程VM
+    echo "正在复制安装脚本到VM..."
+    scp -o StrictHostKeyChecking=no "$0" azureuser@$PUBLIC_IP:/home/azureuser/install.sh
 
     # SSH连接到新创建的VM并执行脚本
-    echo "正在连接到VM..."
-    echo "$SCRIPT_CONTENT" | ssh -tt -o StrictHostKeyChecking=no azureuser@$PUBLIC_IP 'bash -s'
+    echo "正在连接到VM并执行安装脚本..."
+    ssh -o StrictHostKeyChecking=no azureuser@$PUBLIC_IP "chmod +x /home/azureuser/install.sh && bash /home/azureuser/install.sh"
 }
 
 # 检查是否在VM内部运行
@@ -355,10 +353,4 @@ echo "管理员密码: ${ADMIN_PASSWORD}"
 echo "管理员令牌: ${ADMIN_TOKEN}"
 echo "=========================="
 echo ""
-if [ -f /tmp/vm_ip.txt ]; then
-    VM_IP=$(cat /tmp/vm_ip.txt)
-    echo "🌐 网站访问地址: http://${VM_IP}"
-else
-    echo "🌐 网站访问地址: http://当前服务器IP"
-fi
-echo ""
+echo "你现在可以通过 http://服务器IP 访问new-api控制面板"
