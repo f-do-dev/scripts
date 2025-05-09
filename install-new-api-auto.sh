@@ -5,9 +5,9 @@ create_azure_vm() {
     echo "开始创建Azure VM实例..."
     
     # 设置变量
-    RESOURCE_GROUP="vm-group"
+    RESOURCE_GROUP="rg-$(generate_random_string 8)"
     LOCATION="eastus"  # 可以根据需要修改位置
-    VM_NAME="vm-01"
+    VM_NAME="vm-$(generate_random_string 8)"
     VM_SIZE="Standard_B2s"  # 可以根据需要修改VM大小
     
     # 注册必要的资源提供程序
@@ -67,13 +67,9 @@ create_azure_vm() {
     echo "等待VM启动完成..."
     sleep 30
 
-    # 将脚本复制到远程VM
-    echo "正在复制安装脚本到VM..."
-    scp -o StrictHostKeyChecking=no "$0" azureuser@$PUBLIC_IP:/home/azureuser/install.sh
-
-    # SSH连接到新创建的VM并执行脚本
-    echo "正在连接到VM并执行安装脚本..."
-    ssh -o StrictHostKeyChecking=no azureuser@$PUBLIC_IP "chmod +x /home/azureuser/install.sh && bash /home/azureuser/install.sh"
+    # SSH连接到新创建的VM
+    echo "正在连接到VM..."
+    ssh -o StrictHostKeyChecking=no azureuser@$PUBLIC_IP "$(cat $0)"
 }
 
 # 检查是否在VM内部运行
@@ -353,4 +349,4 @@ echo "管理员密码: ${ADMIN_PASSWORD}"
 echo "管理员令牌: ${ADMIN_TOKEN}"
 echo "=========================="
 echo ""
-echo "你现在可以通过 http://服务器IP 访问new-api控制面板"
+echo "你现在可以通过 http://${PUBLIC_IP} 访问new-api控制面板"
