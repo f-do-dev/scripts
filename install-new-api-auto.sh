@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# 生成随机字符串
+generate_random_string() {
+    length=$1
+    tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$length"
+}
+
 # 创建Azure VM实例
 create_azure_vm() {
     echo "开始创建Azure VM实例..."
@@ -156,12 +162,6 @@ check_docker_compose() {
     else
         return 1
     fi
-}
-
-# 生成随机字符串
-generate_random_string() {
-    length=$1
-    tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$length"
 }
 
 # 主程序开始
