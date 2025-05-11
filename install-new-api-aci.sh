@@ -35,22 +35,70 @@ else
     echo "Microsoft.ContainerInstance资源提供程序已注册"
 fi
 
+# 检查并注册Microsoft.ContainerRegistry资源提供程序
+echo "检查Microsoft.ContainerRegistry资源提供程序注册状态..."
+registration_state=$(az provider show --namespace Microsoft.ContainerRegistry --query "registrationState" -o tsv)
+
+if [ "$registration_state" != "Registered" ]; then
+    echo "正在注册Microsoft.ContainerRegistry资源提供程序..."
+    az provider register --namespace Microsoft.ContainerRegistry
+    
+    echo "等待资源提供程序注册完成..."
+    while [ "$(az provider show --namespace Microsoft.ContainerRegistry --query "registrationState" -o tsv)" != "Registered" ]; do
+        echo -n "."
+        sleep 10
+    done
+    echo " 完成!"
+else
+    echo "Microsoft.ContainerRegistry资源提供程序已注册"
+fi
+
 # 设置默认值
 location="eastus"
 current_date=$(date +%Y%m%d%H%M%S)
 resource_group="new-api-rg-$current_date"
 aci_name="new-api-$current_date"
+acr_name="newapiacr$current_date"
 
 echo "使用默认配置："
 echo "区域: $location"
 echo "资源组: $resource_group"
 echo "ACI实例名称: $aci_name"
+echo "ACR名称: $acr_name"
 
 # 创建资源组
 echo "创建资源组..."
 az group create \
     --name "$resource_group" \
     --location "$location"
+
+# 确保ACR名称符合要求（小写字母和数字，5-50个字符）
+acr_name=$(echo "$acr_name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]//g')
+if [ ${#acr_name} -gt 50 ]; then
+    acr_name=${acr_name:0:50}
+fi
+echo "使用ACR名称: $acr_name"
+
+# 创建Azure Container Registry
+echo "创建Azure Container Registry..."
+az acr create \
+    --resource-group "$resource_group" \
+    --name "$acr_name" \
+    --sku Basic \
+    --admin-enabled true
+
+# 导入容器镜像
+echo "导入容器镜像到ACR..."
+az acr import \
+    --name "$acr_name" \
+    --source docker.io/lfnull/new-api-magic:v0.6.6.3 \
+    --image new-api-magic:v0.6.6.3
+
+# 获取ACR登录凭据
+echo "获取ACR登录凭据..."
+acr_username=$(az acr credential show --name "$acr_name" --query "username" -o tsv)
+acr_password=$(az acr credential show --name "$acr_name" --query "passwords[0].value" -o tsv)
+acr_server=$(az acr show --name "$acr_name" --query "loginServer" -o tsv)
 
 # 生成随机密码和令牌
 MYSQL_ROOT_PASSWORD=$(openssl rand -base64 20)
@@ -65,7 +113,10 @@ echo "正在创建ACI实例（不使用持久化存储）..."
 az container create \
     --resource-group "$resource_group" \
     --name "$aci_name" \
-    --image lfnull/new-api-magic:v0.6.6.3 \
+    --image "${acr_server}/new-api-magic:v0.6.6.3" \
+    --registry-login-server "$acr_server" \
+    --registry-username "$acr_username" \
+    --registry-password "$acr_password" \
     --os-type Linux \
     --cpu 2 \
     --memory 4 \
@@ -89,9 +140,10 @@ Admin Token: ${ADMIN_TOKEN}
 Resource Group: ${resource_group}
 Location: ${location}
 ACI Name: ${aci_name}
+ACR Name: ${acr_name}
 Subscription: ${current_subscription}
 
-注意：此部署没有使用持久化存储，容器重启后数据将丢失
+注意：此部署没有使用持久化存储，如果容器重启，数据将丢失
 EOF
 
 chmod 600 aci_credentials.txt
