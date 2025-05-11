@@ -65,6 +65,7 @@ create_azure_aci() {
         --cpu 1 \
         --memory 1.5 \
         --restart-policy Always \
+        --os-type Linux \
         --environment-variables \
             MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD \
             MYSQL_DATABASE=$MYSQL_DATABASE \
@@ -75,15 +76,30 @@ create_azure_aci() {
         --azure-file-volume-share-name $SHARE_NAME \
         --azure-file-volume-mount-path /var/lib/mysql
     
+    # 检查MySQL容器是否创建成功
+    if [ $? -ne 0 ]; then
+        echo "❌ MySQL容器创建失败"
+        exit 1
+    fi
+    
     # 获取MySQL容器的FQDN
     MYSQL_FQDN=$(az container show \
         --resource-group $RESOURCE_GROUP \
         --name "mysql-$ACI_NAME" \
         --query ipAddress.fqdn \
         --output tsv)
+
+    # 如果FQDN不存在，使用IP地址
+    if [ -z "$MYSQL_FQDN" ]; then
+        MYSQL_FQDN=$(az container show \
+            --resource-group $RESOURCE_GROUP \
+            --name "mysql-$ACI_NAME" \
+            --query ipAddress.ip \
+            --output tsv)
+    fi
     
     # 等待MySQL启动完成
-    echo "等待MySQL启动完成..."
+    echo "等待MySQL启动完成，FQDN: $MYSQL_FQDN"
     sleep 60
     
     # 创建new-api容器组
@@ -97,6 +113,7 @@ create_azure_aci() {
         --cpu 1 \
         --memory 1.5 \
         --restart-policy Always \
+        --os-type Linux \
         --environment-variables \
             SQL_DSN="$MYSQL_USER:$MYSQL_PASSWORD@tcp($MYSQL_FQDN:3306)/$MYSQL_DATABASE" \
             TZ=Asia/Shanghai \
@@ -106,6 +123,12 @@ create_azure_aci() {
         --azure-file-volume-account-key "$(az storage account keys list --resource-group $RESOURCE_GROUP --account-name $STORAGE_ACCOUNT_NAME --query "[0].value" --output tsv)" \
         --azure-file-volume-share-name $SHARE_NAME \
         --azure-file-volume-mount-path /data
+        
+    # 检查New-API容器是否创建成功
+    if [ $? -ne 0 ]; then
+        echo "❌ New-API容器创建失败"
+        exit 1
+    fi
     
     # 获取new-api容器的FQDN
     NEW_API_FQDN=$(az container show \
@@ -130,30 +153,53 @@ create_azure_aci() {
     echo "初始化数据库..."
     
     # 生成管理员密码哈希
-    ADMIN_PASSWORD_HASH=$(az container create \
+    echo "生成管理员密码哈希..."
+    TEMP_HASH_CONTAINER="temp-php-hash"
+    az container create \
         --resource-group $RESOURCE_GROUP \
-        --name "temp-php-hash" \
+        --name $TEMP_HASH_CONTAINER \
         --image php:cli \
         --restart-policy Never \
+        --os-type Linux \
         --command-line "php -r \"echo password_hash('$ADMIN_PASSWORD', PASSWORD_DEFAULT);\"" \
-        --output tsv)
+        --output tsv
     
     # 等待临时容器完成
-    sleep 10
+    echo "等待哈希生成完成..."
+    sleep 15
+    
+    # 检查容器状态，确保已完成
+    CONTAINER_STATE=""
+    while [ "$CONTAINER_STATE" != "Terminated" ]; do
+        CONTAINER_STATE=$(az container show \
+            --resource-group $RESOURCE_GROUP \
+            --name $TEMP_HASH_CONTAINER \
+            --query "containers[0].instanceView.currentState.state" \
+            --output tsv)
+        
+        if [ "$CONTAINER_STATE" != "Terminated" ]; then
+            echo "等待容器完成任务，当前状态: $CONTAINER_STATE"
+            sleep 5
+        fi
+    done
     
     # 获取密码哈希输出
     ADMIN_PASSWORD_HASH=$(az container logs \
         --resource-group $RESOURCE_GROUP \
-        --name "temp-php-hash" \
+        --name $TEMP_HASH_CONTAINER \
         --output tsv)
     
+    echo "密码哈希生成完成"
+    
     # 删除临时容器
+    echo "删除临时哈希容器..."
     az container delete \
         --resource-group $RESOURCE_GROUP \
-        --name "temp-php-hash" \
+        --name $TEMP_HASH_CONTAINER \
         --yes
     
     # 创建临时SQL文件
+    echo "创建SQL初始化命令..."
     TMP_SQL_FILE=$(mktemp)
     cat > $TMP_SQL_FILE << EOF
 INSERT INTO \`abilities\` (\`group\`, \`model\`, \`channel_id\`, \`enabled\`, \`priority\`, \`weight\`, \`tag\`) VALUES
@@ -184,22 +230,63 @@ INSERT INTO \`tokens\` (\`user_id\`, \`key\`, \`status\`, \`name\`, \`created_ti
 (1, '$ADMIN_TOKEN', 1, '', UNIX_TIMESTAMP(), UNIX_TIMESTAMP(), -1, 500000000000, 0);
 EOF
 
+    # 读取SQL命令
+    SQL_COMMAND=$(cat $TMP_SQL_FILE)
+    
     # 创建临时容器执行SQL
+    echo "创建临时MySQL容器执行SQL初始化..."
+    TEMP_MYSQL_CONTAINER="temp-mysql-init"
     az container create \
         --resource-group $RESOURCE_GROUP \
-        --name "temp-mysql-init" \
+        --name $TEMP_MYSQL_CONTAINER \
         --image mysql:8.0 \
         --restart-policy Never \
-        --command-line "mysql -h$MYSQL_FQDN -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE -e \"$(cat $TMP_SQL_FILE)\"" \
+        --os-type Linux \
+        --command-line "mysql -h$MYSQL_FQDN -u$MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE -e \"$SQL_COMMAND\"" \
         --output tsv
     
     # 等待临时容器完成
+    echo "等待数据库初始化完成..."
     sleep 30
     
+    # 检查容器状态，确保已完成
+    CONTAINER_STATE=""
+    while [ "$CONTAINER_STATE" != "Terminated" ]; do
+        CONTAINER_STATE=$(az container show \
+            --resource-group $RESOURCE_GROUP \
+            --name $TEMP_MYSQL_CONTAINER \
+            --query "containers[0].instanceView.currentState.state" \
+            --output tsv 2>/dev/null)
+        
+        if [ "$CONTAINER_STATE" != "Terminated" ]; then
+            echo "等待容器完成任务，当前状态: $CONTAINER_STATE"
+            sleep 5
+        fi
+    done
+    
+    # 检查容器执行结果
+    EXIT_CODE=$(az container show \
+        --resource-group $RESOURCE_GROUP \
+        --name $TEMP_MYSQL_CONTAINER \
+        --query "containers[0].instanceView.currentState.exitCode" \
+        --output tsv)
+    
+    if [ "$EXIT_CODE" -ne 0 ]; then
+        echo "❌ 数据库初始化失败，查看日志:"
+        az container logs \
+            --resource-group $RESOURCE_GROUP \
+            --name $TEMP_MYSQL_CONTAINER
+        echo "退出安装..."
+        exit 1
+    else
+        echo "✅ 数据库初始化成功!"
+    fi
+    
     # 删除临时容器
+    echo "删除临时MySQL容器..."
     az container delete \
         --resource-group $RESOURCE_GROUP \
-        --name "temp-mysql-init" \
+        --name $TEMP_MYSQL_CONTAINER \
         --yes
     
     # 删除临时SQL文件
