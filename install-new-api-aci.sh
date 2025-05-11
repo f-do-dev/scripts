@@ -66,6 +66,7 @@ az container create \
     --resource-group "$resource_group" \
     --name "$aci_name" \
     --image lfnull/new-api-magic:v0.6.6.3 \
+    --os-type Linux \
     --cpu 2 \
     --memory 4 \
     --ports 80 \
