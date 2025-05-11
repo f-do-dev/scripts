@@ -17,6 +17,24 @@ current_subscription=$(az account show --query id -o tsv)
 subscription_name=$(az account show --query name -o tsv)
 echo "当前使用的订阅: $subscription_name ($current_subscription)"
 
+# 检查并注册Microsoft.ContainerInstance资源提供程序
+echo "检查Microsoft.ContainerInstance资源提供程序注册状态..."
+registration_state=$(az provider show --namespace Microsoft.ContainerInstance --query "registrationState" -o tsv)
+
+if [ "$registration_state" != "Registered" ]; then
+    echo "正在注册Microsoft.ContainerInstance资源提供程序..."
+    az provider register --namespace Microsoft.ContainerInstance
+    
+    echo "等待资源提供程序注册完成..."
+    while [ "$(az provider show --namespace Microsoft.ContainerInstance --query "registrationState" -o tsv)" != "Registered" ]; do
+        echo -n "."
+        sleep 10
+    done
+    echo " 完成!"
+else
+    echo "Microsoft.ContainerInstance资源提供程序已注册"
+fi
+
 # 设置默认值
 location="eastus"
 current_date=$(date +%Y%m%d%H%M%S)
