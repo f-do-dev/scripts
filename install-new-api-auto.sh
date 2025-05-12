@@ -263,24 +263,32 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    command: --innodb-buffer-pool-size=20M --max-connections=200 --table-open-cache=400 --innodb-log-buffer-size=8M
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: [\"CMD\", \"mysqladmin\", \"ping\", \"-h\", \"localhost\", \"-u\", \"root\", \"-p\${MYSQL_ROOT_PASSWORD}\"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p\${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
 
   new-api:
     image: lfnull/new-api-magic:v0.6.6.3
     restart: always
     ports:
-      - \"80:3000\"
+      - "80:3000"
     environment:
       - SQL_DSN=${MYSQL_USER}:${MYSQL_PASSWORD}@tcp(mysql:3306)/${MYSQL_DATABASE}
       - TZ=Asia/Shanghai
       - GENERATE_DEFAULT_TOKEN=true
       - MODEL_MAPPING=gpt-4-turbo-2024-04-09:gpt-4
+      - MAX_WAIT_SECONDS=10
+      - MAX_REQUEST_RETRIES=3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     volumes:
       - new_api_data:/data
     depends_on:
@@ -316,10 +324,62 @@ sudo docker-compose up -d
 
 # 等待服务启动
 echo "等待服务启动..."
-sleep 20
+echo "这可能需要一到两分钟，请耐心等待..."
+
+# 等待MySQL容器健康检查通过
+MAX_RETRIES=30
+RETRY_INTERVAL=10
+RETRY_COUNT=0
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    if sudo docker-compose ps | grep -q "mysql.*healthy"; then
+        echo "✅ MySQL服务已成功启动并通过健康检查"
+        break
+    fi
+    
+    echo "正在等待MySQL启动... (${RETRY_COUNT}/${MAX_RETRIES})"
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    
+    if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+        echo "❌ MySQL服务启动超时"
+        echo "请尝试手动检查问题: sudo docker-compose logs mysql"
+        exit 1
+    fi
+    
+    sleep $RETRY_INTERVAL
+done
+
+# 确保new-api服务也已启动
+RETRY_COUNT=0
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    if sudo docker-compose ps | grep -q "new-api.*Up"; then
+        echo "✅ New-API服务已成功启动"
+        # 额外等待几秒确保服务完全就绪
+        sleep 10
+        break
+    fi
+    
+    echo "正在等待New-API启动... (${RETRY_COUNT}/${MAX_RETRIES})"
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    
+    if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+        echo "❌ New-API服务启动超时"
+        echo "请尝试手动检查问题: sudo docker-compose logs new-api"
+        exit 1
+    fi
+    
+    sleep $RETRY_INTERVAL
+done
 
 # 直接使用mysql命令执行SQL语句
-sudo docker-compose exec -T mysql mysql -u"${MYSQL_USER}" -p"${MYSQL_PASSWORD}" "${MYSQL_DATABASE}" << EOF
+echo "正在初始化数据库..."
+
+SQL_MAX_RETRIES=5
+SQL_RETRY_COUNT=0
+
+while [ $SQL_RETRY_COUNT -lt $SQL_MAX_RETRIES ]; do
+    # 尝试执行SQL命令
+    sudo docker-compose exec -T mysql mysql -u"${MYSQL_USER}" -p"${MYSQL_PASSWORD}" "${MYSQL_DATABASE}" << EOF
 INSERT INTO \`abilities\` (\`group\`, \`model\`, \`channel_id\`, \`enabled\`, \`priority\`, \`weight\`, \`tag\`) VALUES
 ('default', 'gpt-4-1106-preview', 1, 1, 0, 0, '');
 
@@ -348,14 +408,33 @@ INSERT INTO \`tokens\` (\`user_id\`, \`key\`, \`status\`, \`name\`, \`created_ti
 (1, '${ADMIN_TOKEN}', 1, '', UNIX_TIMESTAMP(), UNIX_TIMESTAMP(), -1, 500000000000, 0);
 EOF
 
-# 检查SQL执行是否成功
-if [ $? -ne 0 ]; then
-    echo "❌ SQL语句执行失败"
-    exit 1
-fi
+    # 检查SQL执行是否成功
+    if [ $? -eq 0 ]; then
+        echo "✅ 数据库初始化成功"
+        break
+    else
+        echo "⚠️ 数据库初始化失败，正在重试 (${SQL_RETRY_COUNT}/${SQL_MAX_RETRIES})..."
+        SQL_RETRY_COUNT=$((SQL_RETRY_COUNT + 1))
+        
+        if [ $SQL_RETRY_COUNT -eq $SQL_MAX_RETRIES ]; then
+            echo "❌ 数据库初始化失败，达到最大重试次数"
+            echo "可能数据库已经包含这些数据，尝试继续安装..."
+            break
+        fi
+        
+        # 等待MySQL更加稳定
+        sleep 15
+    fi
+done
 
-echo "✅ 数据库初始化完成"
 echo "安装完成！请查看 mysql_credentials.txt 获取所有凭据信息"
+
+# 获取当前服务器IP地址
+if [ -z "${PUBLIC_IP}" ]; then
+    SERVER_IP=$(curl -s ifconfig.me || curl -s icanhazip.com || curl -s ip.sb || hostname -I | awk '{print $1}')
+else
+    SERVER_IP="${PUBLIC_IP}"
+fi
 
 # 打印new-api的账号和密码信息
 echo ""
@@ -365,4 +444,4 @@ echo "管理员密码: ${ADMIN_PASSWORD}"
 echo "管理员令牌: ${ADMIN_TOKEN}"
 echo "=========================="
 echo ""
-echo "你现在可以通过 http://${PUBLIC_IP} 访问new-api控制面板"
+echo "你现在可以通过 http://${SERVER_IP} 访问new-api控制面板"
