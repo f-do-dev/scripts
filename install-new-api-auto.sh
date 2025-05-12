@@ -89,27 +89,9 @@ create_azure_vm() {
     echo "等待VM启动完成..."
     sleep 30
 
-    # 创建一个临时脚本，并在其中包含generate_random_string函数
-    TEMP_SCRIPT=$(mktemp)
-    cat > $TEMP_SCRIPT << 'EOF'
-#!/bin/bash
-
-# 在临时脚本中定义generate_random_string函数
-generate_random_string() {
-    length=$1
-    tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$length"
-}
-
-EOF
-    # 将原脚本内容追加到临时脚本
-    cat $0 >> $TEMP_SCRIPT
-    
     # SSH连接到新创建的VM
     echo "正在连接到VM..."
-    ssh -o StrictHostKeyChecking=no azureuser@$PUBLIC_IP "bash -s" < $TEMP_SCRIPT
-    
-    # 删除临时脚本
-    rm $TEMP_SCRIPT
+    ssh -o StrictHostKeyChecking=no azureuser@$PUBLIC_IP "$(cat $0)"
 }
 
 # 检查是否在VM内部运行
@@ -198,6 +180,12 @@ check_docker_compose() {
     fi
 }
 
+# 生成随机字符串
+generate_random_string() {
+    length=$1
+    tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$length"
+}
+
 # 主程序开始
 echo "开始检查权限..."
 if ! check_sudo; then
@@ -231,15 +219,6 @@ if ! check_docker_compose; then
     sudo chmod +x /usr/local/bin/docker-compose
 else
     echo "跳过Docker Compose安装..."
-fi
-
-# 检查是否存在generate_random_string函数
-if ! command -v generate_random_string &> /dev/null; then
-    # 如果函数不存在，重新定义它
-    generate_random_string() {
-        length=$1
-        tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$length"
-    }
 fi
 
 # 生成随机密码和令牌
