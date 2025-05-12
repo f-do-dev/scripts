@@ -10,11 +10,27 @@ generate_random_string() {
 create_azure_vm() {
     echo "开始创建Azure VM实例..."
     
-    # 设置变量
-    RESOURCE_GROUP="rg-$(generate_random_string 8)"
-    LOCATION="eastus"  # 可以根据需要修改位置
-    VM_NAME="vm-$(generate_random_string 8)"
+    # 设置变量和随机生成资源名称
+    # 随机生成资源组名称
+    RESOURCE_GROUPS=("cloud-rg-$(generate_random_string 6)" "azure-group-$(generate_random_string 5)" "vm-cluster-$(generate_random_string 4)")
+    RANDOM_INDEX=$((RANDOM % 3))
+    RESOURCE_GROUP="${RESOURCE_GROUPS[$RANDOM_INDEX]}"
+    
+    # 随机选择地区
+    LOCATIONS=("eastus" "westus" "northeurope")
+    RANDOM_INDEX=$((RANDOM % 3))
+    LOCATION="${LOCATIONS[$RANDOM_INDEX]}"
+    
+    # 随机生成VM名称
+    VM_NAMES=("vm-server-$(generate_random_string 4)" "azure-vm-$(generate_random_string 5)" "cloud-instance-$(generate_random_string 3)")
+    RANDOM_INDEX=$((RANDOM % 3))
+    VM_NAME="${VM_NAMES[$RANDOM_INDEX]}"
+    
     VM_SIZE="Standard_B2s"  # 可以根据需要修改VM大小
+    
+    echo "已选择资源组: $RESOURCE_GROUP"
+    echo "已选择地区: $LOCATION"
+    echo "已选择虚拟机名称: $VM_NAME"
     
     # 注册必要的资源提供程序
     echo "正在注册必要的资源提供程序..."
