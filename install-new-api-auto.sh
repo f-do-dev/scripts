@@ -330,7 +330,7 @@ INSERT INTO \`abilities\` (\`group\`, \`model\`, \`channel_id\`, \`enabled\`, \`
 ('default', 'gpt-4-1106-preview', 1, 1, 0, 0, '');
 
 INSERT INTO \`channels\` (\`id\`, \`type\`, \`key\`, \`open_ai_organization\`, \`test_model\`, \`status\`, \`name\`, \`weight\`, \`created_time\`, \`test_time\`, \`response_time\`, \`base_url\`, \`other\`, \`balance\`, \`balance_updated_time\`, \`models\`, \`group\`, \`used_quota\`, \`model_mapping\`, \`status_code_mapping\`, \`priority\`, \`auto_ban\`, \`other_info\`, \`tag\`, \`setting\`, \`param_override\`) VALUES
-(1, 3, 'test', '', '', 1, 'az', 0, 1745121022, 1745121045, 1212, 'https://inapi.openai.azure.com', '2025-01-01-preview', 0, 0, 'gpt-4-1106-preview', 'default', 0, '{\n  \"gpt-4-1106-preview\": \"gpt-4\"\n}', '', 0, 1, '', '', NULL, NULL);
+(1, 3, 'test', '', '', 1, 'az', 0, 1745121022, 1745121045, 1212, 'https://xxx.openai.azure.com', '2024-12-01-preview', 0, 0, 'gpt-4-1106-preview', 'default', 0, '{\n  \"gpt-4-1106-preview\": \"gpt-4\"\n}', '', 0, 1, '', '', NULL, NULL);
 
 INSERT INTO \`logs\` (\`id\`, \`user_id\`, \`created_at\`, \`type\`, \`content\`, \`username\`, \`token_name\`, \`model_name\`, \`quota\`, \`prompt_tokens\`, \`completion_tokens\`, \`use_time\`, \`is_stream\`, \`channel_id\`, \`channel_name\`, \`token_id\`, \`group\`, \`other\`) VALUES
 (1, 1, 1745121033, 3, '管理员将用户额度从 ＄200.000000 额度修改为 ＄2000000.000000 额度', 'az-root', '', '', 0, 0, 0, 0, 0, 0, NULL, 0, '', '');
